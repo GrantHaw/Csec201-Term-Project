@@ -49,6 +49,30 @@ int main() {
             continue;
         }
 
+        // delete
+        if (strcmp(first, "delete") == 0) {
+            if (second == NULL || third == NULL) {
+                printf("Syntax error: delete local|remote <filename>\n");
+            } else if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
+                printf("'%s' is not recognized. Valid options are 'local' and 'remote'.\n", second);
+            } else {
+                printf("Valid command: delete %s %s\n", second, third);
+            }
+            continue;
+        }
+
+        // change
+        if (strcmp(first, "change") == 0) {
+            if (second == NULL || third == NULL) {
+                printf("Syntax error: change local|remote <filepath>\n");
+            } else if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
+                printf("'%s' is not recognized. Valid options are 'local' and 'remote'.\n", second);
+            } else {
+                printf("Valid command: change %s %s\n", second, third);
+            }
+            continue;
+        }
+
     }
 
     return 0;
