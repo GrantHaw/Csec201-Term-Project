@@ -73,6 +73,42 @@ int main() {
             continue;
         }
 
+        // show
+        if (strcmp(first, "show") == 0) {
+            if (second == NULL || third == NULL) {
+                printf("Syntax error: show local|remote path|files|folders\n");
+            } else if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
+                printf("'%s' is not recognized. Valid options for show are 'local' and 'remote'.\n", second);
+            } else if (strcmp(third, "path") != 0 && strcmp(third, "files") != 0 && strcmp(third, "folders") != 0) {
+                printf("'%s' is not recognized. Valid options are 'path', 'files', and 'folders'.\n", third);
+            } else {
+                printf("Valid command: show %s %s\n", second, third);
+            }
+            continue;
+        }
+
+        // history
+        if (strcmp(first, "history") == 0) {
+            if (second != NULL) {
+                printf("Syntax error: 'history' takes no parameters.\n");
+            } else {
+                printf("Valid command: history\n");
+            }
+            continue;
+        }
+
+        // validate
+        if (strcmp(first, "validate") == 0) {
+            if (second != NULL) {
+                printf("Syntax error: 'validate' takes no parameters.\n");
+            } else {
+                printf("Valid command: validate\n");
+            }
+            continue;
+        }
+
+        // Unknown command
+        printf("%s is not a valid FML command.\n", first);
     }
 
     return 0;
