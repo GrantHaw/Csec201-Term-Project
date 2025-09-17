@@ -28,6 +28,27 @@ int main() {
             printf("Exiting FML.\n");
             break;
         }
+
+        // upload
+        if (strcmp(first, "upload") == 0) {
+            if (second == NULL || third == NULL) {
+                printf("Syntax error: upload <local filename> <remote filename>\n");
+            } else {
+                printf("Valid command: upload %s %s\n", second, third);
+            }
+            continue;
+        }
+
+        // download
+        if (strcmp(first, "download") == 0) {
+            if (second == NULL || third == NULL) {
+                printf("Syntax error: download <remote filename> <local filename>\n");
+            } else {
+                printf("Valid command: download %s %s\n", second, third);
+            }
+            continue;
+        }
+
     }
 
     return 0;
