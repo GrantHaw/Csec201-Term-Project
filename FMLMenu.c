@@ -23,6 +23,11 @@ int main() {
         if (first == NULL) {
             continue;
         }
+        //quit
+        if (strcmp(first, "quit") == 0) {
+            printf("Exiting FML.\n");
+            break;
+        }
     }
 
     return 0;
