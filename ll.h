@@ -4,7 +4,7 @@
 struct node {
 	char command[256];
 
-	struct* node next;
+	struct node* next;
 };
 
 struct LinkedList {
@@ -14,8 +14,8 @@ struct LinkedList {
 
 void initialize(struct LinkedList* list);
 
-void addCommand(struct LinkedList* list);
+void addCommand(struct LinkedList* list, char * command);
 
 void printHistory(struct LinkedList* list);
 
-void deleteList (LinkedList* list);
+void deleteList(struct LinkedList* list);
