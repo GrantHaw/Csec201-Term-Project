@@ -34,3 +34,16 @@ void printHistory(struct LinkedList* list) {
 	}
 }
 
+void deleteList(struct LinkedList * list) {
+	struct node* current =list->head;
+	struct node* next;
+
+	while (current != NULL) {
+		next = current->next;
+		free(current);
+		current = next;
+	}
+	list->head = NULL;
+	list->size = 0;
+}
+

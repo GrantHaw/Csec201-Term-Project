@@ -1,10 +1,15 @@
-
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <string.h>
+#include "ll.h"
 
 int main() {
     char input[256];
+    char originalInput[256];
     char *first, *second, *third;
+    struct LinkedList commandHistory;
+
+    initialize(&commandHistory);
 
     printf("FML Command Parser (type quit to exit)\n");
 
@@ -16,6 +21,8 @@ int main() {
             input[strlen(input)-1] = '\0';
         }
 
+        strcpy(originalInput, input);
+
         first = strtok(input, " ");
         second = strtok(NULL, " ");
         third = strtok(NULL, " ");
@@ -26,7 +33,22 @@ int main() {
         //quit
         if (strcmp(first, "quit") == 0) {
             printf("Exiting FML.\n");
+
+            deleteList(&commandHistory);
             break;
+        }
+
+        // history
+        if (strcmp(first, "history") == 0) {
+            if (second != NULL) {
+                printf("Syntax error: 'history' takes no parameters.\n");
+            }
+            else {
+                printHistory(&commandHistory);
+
+                addCommand(&commandHistory, originalInput);
+            }
+            continue;
         }
 
         // upload
@@ -35,6 +57,7 @@ int main() {
                 printf("Syntax error: upload <local filename> <remote filename>\n");
             } else {
                 printf("Valid command: upload %s %s\n", second, third);
+                addCommand(&commandHistory, originalInput);
             }
             continue;
         }
@@ -45,6 +68,7 @@ int main() {
                 printf("Syntax error: download <remote filename> <local filename>\n");
             } else {
                 printf("Valid command: download %s %s\n", second, third);
+                addCommand(&commandHistory, originalInput);
             }
             continue;
         }
@@ -57,6 +81,7 @@ int main() {
                 printf("'%s' is not recognized. Valid options are 'local' and 'remote'.\n", second);
             } else {
                 printf("Valid command: delete %s %s\n", second, third);
+                addCommand(&commandHistory, originalInput);
             }
             continue;
         }
@@ -69,6 +94,7 @@ int main() {
                 printf("'%s' is not recognized. Valid options are 'local' and 'remote'.\n", second);
             } else {
                 printf("Valid command: change %s %s\n", second, third);
+                addCommand(&commandHistory, originalInput);
             }
             continue;
         }
@@ -83,19 +109,12 @@ int main() {
                 printf("'%s' is not recognized. Valid options are 'path', 'files', and 'folders'.\n", third);
             } else {
                 printf("Valid command: show %s %s\n", second, third);
+                addCommand(&commandHistory, originalInput);
             }
             continue;
         }
 
-        // history
-        if (strcmp(first, "history") == 0) {
-            if (second != NULL) {
-                printf("Syntax error: 'history' takes no parameters.\n");
-            } else {
-                printf("Valid command: history\n");
-            }
-            continue;
-        }
+        
 
         // validate
         if (strcmp(first, "validate") == 0) {
@@ -103,6 +122,7 @@ int main() {
                 printf("Syntax error: 'validate' takes no parameters.\n");
             } else {
                 printf("Valid command: validate\n");
+                addCommand(&commandHistory, originalInput);
             }
             continue;
         }
