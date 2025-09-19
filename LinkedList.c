@@ -8,4 +8,29 @@ void initialize(struct LinkedList* list) {
 	list->head = NULL;
 }
 
-void addCommand()
+void addCommand(struct LinkedList*, char* command) {
+	struct node* newNode = (struct node*)malloc(sizeof(struct node));
+	strcpy(newNode->command, command);
+
+	newNode->next = list->head;
+	list->head = newNode;
+	list->size++;
+}
+
+void printHistory(struct LinkedList* list) {
+	struct node* temp = list->head;
+	int commandNumber = list->size;
+
+	if (temp == NULL) {
+		printf("No commands in history :(");
+		return;
+	}
+
+	printf("Command History:");
+	while (temp != NULL) {
+		printf("%d: %s\n", commandNumber, temp->command);
+		temp = temp->next;
+		commandNumber--;
+	}
+}
+
