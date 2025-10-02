@@ -119,10 +119,14 @@ int main() {
         if (strcmp(first, "validate") == 0) {
             if (second != NULL) {
                 printf("Syntax error: 'validate' takes no parameters.\n");
-            } else {
-                printf("Valid command: validate\n");
-                addCommand(&commandHistory, originalInput);
             }
+            else {
+                printf("Valid command: validate\n");
+                // validate blockchauin  
+                validateBlockchain(&commandHistory);
+                // add cmd
+                addCommand(&commandHistory, originalInput);
+            } 
             continue;
         }
 
