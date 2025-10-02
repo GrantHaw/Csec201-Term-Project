@@ -76,46 +76,50 @@ void printHistory(struct LinkedList* list) {
     }
 }
 
-//validates entire blockchain
 int validateBlockchain(struct LinkedList* list) {
-    struct node* current = list->head;
-    unsigned int prevHash = SEED; //start w/ seed
-    int alterationDetected = 0;
-    int nodeIndex = list->size;
-    
-    if (current == NULL) {
+    if (list->head == NULL) {
         printf("Blockchain is empty - valid by default.\n");
         return 1;
     }
-    
+
     printf("Validating blockchain integrity...\n");
-    //walk thru chain
-    while (current != NULL) {
-		//redo computation to make sure hash is same
-        unsigned int recomputedHash = nextHash(prevHash, (const unsigned char*)current->command, strlen(current->command));
-        
-        if (current->hash != recomputedHash) {
-			//SOUND THE ALARM!!!!!!!!
+
+    struct node* nodes[1000];
+    int count = 0;
+    struct node* current = list->head;
+
+    while (current != NULL && count < 1000) {
+        nodes[count] = current;
+        current = current->next;
+        count++;
+    }
+
+    unsigned int prevHash = SEED;
+    int alterationDetected = 0;
+    int i;
+
+    for (i = count - 1; i >= 0; i--) {
+        unsigned int recomputedHash = nextHash(prevHash, (const unsigned char*)nodes[i]->command, strlen(nodes[i]->command));
+
+        if (nodes[i]->hash != recomputedHash) {
             printf("ALTERATION DETECTED!\n");
-            printf("Node %d altered: \"%s\"\n", nodeIndex, current->command);
+            printf("Node %d altered: \"%s\"\n", i + 1, nodes[i]->command);
             printf("Expected hash: 0x%08X\n", recomputedHash);
-            printf("Actual hash:   0x%08X\n", current->hash);
+            printf("Actual hash:   0x%08X\n", nodes[i]->hash);
             alterationDetected = 1;
         }
-        //move to next
-        prevHash = current->hash;
-        current = current->next;
-        nodeIndex--;
+
+        prevHash = nodes[i]->hash;
     }
-    
+
     if (!alterationDetected) {
-		// we good
         printf("Blockchain integrity verified - no alterations detected.\n");
         return 1;
     }
-    
+
     return 0;
 }
+
 
 void deleteList(struct LinkedList* list) {
     struct node* current = list->head;
