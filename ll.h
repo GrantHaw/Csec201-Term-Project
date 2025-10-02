@@ -31,3 +31,8 @@ unsigned int rotl32(unsigned int x, int r);
 unsigned int nextHash(unsigned int prevHash, const unsigned char* bytes, int length);
 
 int validateBlockchain(struct LinkedList* list);
+
+// Test blockchain!
+void testModifyCommand(struct LinkedList* list, int nodePosition, char* newCommand);
+void testModifyHash(struct LinkedList* list, int nodePosition);
+void testDeleteNode(struct LinkedList* list, int nodePosition);

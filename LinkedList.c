@@ -134,3 +134,89 @@ void deleteList(struct LinkedList* list) {
     list->head = NULL;
     list->size = 0;
 }
+void testModifyCommand(struct LinkedList* list, int nodePosition, char* newCommand) {
+    if (list->head == NULL) {
+        printf("Cannot test - blockchain is empty\n");
+        return;
+    }
+
+    struct node* current = list->head;
+    int count = 1;
+
+    //find node
+    while (current != NULL && count < nodePosition) {
+        current = current->next;
+        count++;
+    }
+
+    if (current != NULL) {
+        printf("TEST: Changing command from \"%s\" to \"%s\"\n", current->command, newCommand);
+        strcpy(current->command, newCommand);
+    }
+    else {
+        printf("Node %d not found\n", nodePosition);
+    }
+}
+
+//Modify hash directly
+void testModifyHash(struct LinkedList* list, int nodePosition) {
+    if (list->head == NULL) {
+        printf("Cannot test - blockchain is empty\n");
+        return;
+    }
+
+    struct node* current = list->head;
+    int count = 1;
+
+    //find node
+    while (current != NULL && count < nodePosition) {
+        current = current->next;
+        count++;
+    }
+
+    if (current != NULL) {
+        printf("TEST: Changing hash from 0x%08X to 0x%08X\n", current->hash, current->hash + 1);
+        current->hash = current->hash + 1; //just changin hash
+    }
+    else {
+        printf("Node %d not found\n", nodePosition);
+    }
+}
+
+// delete head node
+void testDeleteNode(struct LinkedList* list, int nodePosition) {
+    if (list->head == NULL) {
+        printf("Cannot test - blockchain is empty\n");
+        return;
+    }
+
+    if (nodePosition == 1) {
+        //delete head
+        struct node* temp = list->head;
+        printf("TEST: Deleting head node \"%s\"\n", temp->command);
+        list->head = list->head->next;
+        free(temp);
+        list->size--;
+        return;
+    }
+
+    struct node* current = list->head;
+    int count = 1;
+
+    //find the node before to del
+    while (current != NULL && current->next != NULL && count < nodePosition - 1) {
+        current = current->next;
+        count++;
+    }
+
+    if (current != NULL && current->next != NULL) {
+        struct node* nodeToDelete = current->next;
+        printf("TEST: Deleting node \"%s\"\n", nodeToDelete->command);
+        current->next = nodeToDelete->next;
+        free(nodeToDelete);
+        list->size--;
+    }
+    else {
+        printf("Node %d not found\n", nodePosition);
+    }
+}

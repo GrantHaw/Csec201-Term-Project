@@ -129,6 +129,24 @@ int main() {
             } 
             continue;
         }
+        
+        if (strcmp(first, "test1") == 0) {
+            testModifyCommand(&commandHistory, 2, "HACKED COMMAND");
+            printf("Modified node 2's command\n");
+            continue;
+        }
+
+        if (strcmp(first, "test2") == 0) {
+            testModifyHash(&commandHistory, 1);
+            printf("Modified node 1's hash\n");
+            continue;
+        }
+
+        if (strcmp(first, "test3") == 0) {
+            testDeleteNode(&commandHistory, 2);
+            printf("Deleted node 2\n");
+            continue;
+        }
 
         // Unknown command
         printf("%s is not a valid FML command.\n", first);
