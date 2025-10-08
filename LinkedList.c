@@ -102,22 +102,18 @@ int validateBlockchain(struct LinkedList* list) {
         unsigned int recomputedHash = nextHash(prevHash, (const unsigned char*)nodes[i]->command, strlen(nodes[i]->command));
 
         if (nodes[i]->hash != recomputedHash) {
-            printf("ALTERATION DETECTED!\n");
-            printf("Node %d altered: \"%s\"\n", i + 1, nodes[i]->command);
+            printf("Command history validation FAILED.\n");
+            printf("First invalid node detected: \"%s\"\n", nodes[i]->command);
             printf("Expected hash: 0x%08X\n", recomputedHash);
             printf("Actual hash:   0x%08X\n", nodes[i]->hash);
-            alterationDetected = 1;
+            return 0;
         }
-
+        
         prevHash = nodes[i]->hash;
     }
-
-    if (!alterationDetected) {
-        printf("Blockchain integrity verified - no alterations detected.\n");
-        return 1;
-    }
-
-    return 0;
+    
+    printf("Command history validation PASSED - no alterations detected.\n");
+    return 1;
 }
 
 
@@ -219,4 +215,18 @@ void testDeleteNode(struct LinkedList* list, int nodePosition) {
     else {
         printf("Node %d not found\n", nodePosition);
     }
+}
+
+// Test changing two commands
+void testModifyTwoCommands(struct LinkedList* list) {
+    testModifyCommand(list, 1, "HACKED COMMAND 1");
+    testModifyCommand(list, 2, "HACKED COMMAND 2");
+    printf("TEST: Modified two commands\n");
+}
+
+// Test changing two hashes
+void testModifyTwoHashes(struct LinkedList* list) {
+    testModifyHash(list, 1);
+    testModifyHash(list, 2);
+    printf("TEST: Modified two hashes\n");
 }

@@ -45,6 +45,8 @@ int main() {
             else {
                 printHistory(&commandHistory);
 
+                validateBlockchain(&commandHistory);
+
                 addCommand(&commandHistory, originalInput);
             }
             continue;
@@ -130,21 +132,67 @@ int main() {
             continue;
         }
         
-        if (strcmp(first, "test1") == 0) {
-            testModifyCommand(&commandHistory, 2, "HACKED COMMAND");
-            printf("Modified node 2's command\n");
+        if (strcmp(first, "test_delete_node") == 0) {
+            if (second == NULL) {
+                printf("Syntax error: test_delete_node <node_position>\n");
+            } else {
+                int nodePos = atoi(second);
+                printf("TEST: Attempting to delete node at position %d\n", nodePos);
+                testDeleteNode(&commandHistory, nodePos);
+                printf("Node deletion test completed. Run 'validate' to check integrity.\n");
+            }
             continue;
         }
 
-        if (strcmp(first, "test2") == 0) {
+        if (strcmp(first, "test_modify_command") == 0) {
+            if (second == NULL || third == NULL) {
+                printf("Syntax error: test_modify_command <node_position> <new_command>\n");
+            } else {
+                int nodePos = atoi(second);
+                printf("TEST: Attempting to modify command at position %d\n", nodePos);
+                testModifyCommand(&commandHistory, nodePos, third);
+                printf("Command modification test completed. Run 'validate' to check integrity.\n");
+            }
+            continue;
+        }
+
+        if (strcmp(first, "test_modify_two_commands") == 0) {
+            printf("TEST: Modifying commands in positions 1 and 2\n");
+            testModifyCommand(&commandHistory, 1, "HACKED_COMMAND_1");
+            testModifyCommand(&commandHistory, 2, "HACKED_COMMAND_2");
+            printf("Two-command modification test completed. Run 'validate' to check integrity.\n");
+            continue;
+        }
+
+        if (strcmp(first, "test_modify_hash") == 0) {
+            if (second == NULL) {
+                printf("Syntax error: test_modify_hash <node_position>\n");
+            } else {
+                int nodePos = atoi(second);
+                printf("TEST: Attempting to modify hash at position %d\n", nodePos);
+                testModifyHash(&commandHistory, nodePos);
+                printf("Hash modification test completed. Run 'validate' to check integrity.\n");
+            }
+            continue;
+        }
+
+        if (strcmp(first, "test_modify_two_hashes") == 0) {
+            printf("TEST: Modifying hashes in positions 1 and 2\n");
             testModifyHash(&commandHistory, 1);
-            printf("Modified node 1's hash\n");
+            testModifyHash(&commandHistory, 2);
+            printf("Two-hash modification test completed. Run 'validate' to check integrity.\n");
             continue;
         }
 
-        if (strcmp(first, "test3") == 0) {
-            testDeleteNode(&commandHistory, 2);
-            printf("Deleted node 2\n");
+        if (strcmp(first, "test_help") == 0) {
+            printf("Available blockchain integrity tests:\n");
+            printf("  test_delete_node <position>           - Delete node at specified position\n");
+            printf("  test_modify_command <pos> <new_cmd>   - Change command at position\n");
+            printf("  test_modify_two_commands              - Change commands at positions 1 and 2\n");
+            printf("  test_modify_hash <position>           - Change hash at specified position\n");
+            printf("  test_modify_two_hashes                - Change hashes at positions 1 and 2\n");
+            printf("  validate                              - Check blockchain integrity\n");
+            printf("  history                               - Show command history with auto-validation\n");
             continue;
         }
 
