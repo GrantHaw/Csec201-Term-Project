@@ -1,12 +1,76 @@
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
+#include <stdlib.h>
 #include "ll.h"
+
+
+//creating pointers
+typedef void (*CanonicalizeFunc)(char*, char*);
+typedef unsigned int (*Rotl32Func)(unsigned int, int);
+typedef unsigned int (*NextHashFunc)(unsigned int, const unsigned char*, int);
+
+
+HMODULE hDLL = NULL;
+CanonicalizeFunc canonicalize = NULL;
+Rotl32Func rotl32 = NULL;
+NextHashFunc nextHash = NULL;
+
+//load blockchain dll
+int loadBlockchainDLL() {
+    hDLL = LoadLibrary(L"BlockchainDLL.dll");
+    if (hDLL == NULL) {
+        printf("ERROR: Could not load BlockchainDLL.dll\n");
+        printf("Make sure the DLL file is in the same directory as the executable.\n");
+        return 0;
+    }
+
+    canonicalize = (CanonicalizeFunc)GetProcAddress(hDLL, "canonicalize");
+    if (canonicalize == NULL) {
+        printf("ERROR: Could not find 'canonicalize' function in DLL\n");
+        FreeLibrary(hDLL);
+        return 0;
+    }
+
+    rotl32 = (Rotl32Func)GetProcAddress(hDLL, "rotl32");
+    if (rotl32 == NULL) {
+        printf("ERROR: Could not find 'rotl32' function in DLL\n");
+        FreeLibrary(hDLL);
+        return 0;
+    }
+
+    nextHash = (NextHashFunc)GetProcAddress(hDLL, "nextHash");
+    if (nextHash == NULL) {
+        printf("ERROR: Could not find 'nextHash' function in DLL\n");
+        FreeLibrary(hDLL);
+        return 0;
+    }
+
+    printf("Blockchain DLL loaded successfully.\n");
+    return 1;
+}
+
+//nvm put it back
+void unloadBlockchainDLL() {
+    if (hDLL != NULL) {
+        FreeLibrary(hDLL);
+        hDLL = NULL;
+        canonicalize = NULL;
+        rotl32 = NULL;
+        nextHash = NULL;
+    }
+}
 
 int main() {
     char input[256];
     char originalInput[256];
     char *first, *second, *third;
     struct LinkedList commandHistory;
+
+    if (!loadBlockchainDLL()) {
+        printf("Failed to load blockchain functionality. Exiting.\n");
+        return 1;
+    }
 
     initialize(&commandHistory);
 
@@ -34,6 +98,7 @@ int main() {
             printf("Exiting FML.\n");
 
             deleteList(&commandHistory);
+            unloadBlockchainDLL();
             break;
         }
 
