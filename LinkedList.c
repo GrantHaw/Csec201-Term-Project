@@ -3,45 +3,16 @@
 #include <string.h>
 #include "ll.h"
 
+#define SEED 0x5A
+
 // External function pointers loaded from DLL
 extern void (*canonicalize)(char*, char*);
 extern unsigned int (*rotl32)(unsigned int, int);
 extern unsigned int (*nextHash)(unsigned int, const unsigned char*, int);
 
-#define SEED 0x5A //starting val
-
 void initialize(struct LinkedList* list) {
     list->size = 0;
     list->head = NULL;
-}
-
-// cleanup
-void canonicalize(char* input, char* output) {
-    strcpy(output, input);
-    int len = strlen(output);
-    if (len > 0 && output[len-1] == '\n') {
-        output[len-1] = '\0';
-    }
-}
-
-//32 bit left rot.
-unsigned int rotl32(unsigned int x, int r) {
-    return ((x << r) | (x >> (32 - r))) & 0xFFFFFFFF;
-}
-
-//core hash func (mixes prev hash with new)
-unsigned int nextHash(unsigned int prevHash, const unsigned char* bytes, int length) {
-    unsigned int h = prevHash & 0xFFFFFFFF; //prev hash
-    int i;
-    
-    for (i = 0; i < length; i++) {
-        h = h ^ bytes[i]; //xor
-        h = rotl32(h, 5); //rot left 5 positions for funsies again
-        h = (h * 0x01000193) & 0xFFFFFFFF; //multiply by prime constant
-    }
-    
-    h = h ^ length; //now lets mix length in
-    return h;
 }
 
 void addCommand(struct LinkedList* list, char* command) {
@@ -86,41 +57,43 @@ int validateBlockchain(struct LinkedList* list) {
         printf("Blockchain is empty - valid by default.\n");
         return 1;
     }
-
-    printf("Validating blockchain integrity...\n");
-
+    
     struct node* nodes[1000];
     int count = 0;
     struct node* current = list->head;
-
+    
     while (current != NULL && count < 1000) {
         nodes[count] = current;
         current = current->next;
         count++;
     }
-
+    
     unsigned int prevHash = SEED;
     int alterationDetected = 0;
     int i;
-
+    
     for (i = count - 1; i >= 0; i--) {
         unsigned int recomputedHash = nextHash(prevHash, (const unsigned char*)nodes[i]->command, strlen(nodes[i]->command));
-
+        
         if (nodes[i]->hash != recomputedHash) {
             printf("Command history validation FAILED.\n");
             printf("First invalid node detected: \"%s\"\n", nodes[i]->command);
             printf("Expected hash: 0x%08X\n", recomputedHash);
             printf("Actual hash:   0x%08X\n", nodes[i]->hash);
-            return 0;
+            alterationDetected = 1;
+            break;
         }
         
         prevHash = nodes[i]->hash;
     }
     
-    printf("Command history validation PASSED - no alterations detected.\n");
-    return 1;
+    if (!alterationDetected) {
+        printf("Command history validation PASSED - no alterations detected.\n");
+        return 1;
+    }
+    
+    return 0;
 }
-
 
 void deleteList(struct LinkedList* list) {
     struct node* current = list->head;
@@ -135,64 +108,58 @@ void deleteList(struct LinkedList* list) {
     list->head = NULL;
     list->size = 0;
 }
+
 void testModifyCommand(struct LinkedList* list, int nodePosition, char* newCommand) {
     if (list->head == NULL) {
         printf("Cannot test - blockchain is empty\n");
         return;
     }
-
+    
     struct node* current = list->head;
     int count = 1;
-
-    //find node
+    
     while (current != NULL && count < nodePosition) {
         current = current->next;
         count++;
     }
-
+    
     if (current != NULL) {
         printf("TEST: Changing command from \"%s\" to \"%s\"\n", current->command, newCommand);
         strcpy(current->command, newCommand);
-    }
-    else {
+    } else {
         printf("Node %d not found\n", nodePosition);
     }
 }
 
-//Modify hash directly
 void testModifyHash(struct LinkedList* list, int nodePosition) {
     if (list->head == NULL) {
         printf("Cannot test - blockchain is empty\n");
         return;
     }
-
+    
     struct node* current = list->head;
     int count = 1;
-
-    //find node
+    
     while (current != NULL && count < nodePosition) {
         current = current->next;
         count++;
     }
-
+    
     if (current != NULL) {
         printf("TEST: Changing hash from 0x%08X to 0x%08X\n", current->hash, current->hash + 1);
-        current->hash = current->hash + 1; //just changin hash
-    }
-    else {
+        current->hash = current->hash + 1;
+    } else {
         printf("Node %d not found\n", nodePosition);
     }
 }
 
-// delete head node
 void testDeleteNode(struct LinkedList* list, int nodePosition) {
     if (list->head == NULL) {
         printf("Cannot test - blockchain is empty\n");
         return;
     }
-
+    
     if (nodePosition == 1) {
-        //delete head
         struct node* temp = list->head;
         printf("TEST: Deleting head node \"%s\"\n", temp->command);
         list->head = list->head->next;
@@ -200,38 +167,22 @@ void testDeleteNode(struct LinkedList* list, int nodePosition) {
         list->size--;
         return;
     }
-
+    
     struct node* current = list->head;
     int count = 1;
-
-    //find the node before to del
+    
     while (current != NULL && current->next != NULL && count < nodePosition - 1) {
         current = current->next;
         count++;
     }
-
+    
     if (current != NULL && current->next != NULL) {
         struct node* nodeToDelete = current->next;
         printf("TEST: Deleting node \"%s\"\n", nodeToDelete->command);
         current->next = nodeToDelete->next;
         free(nodeToDelete);
         list->size--;
-    }
-    else {
+    } else {
         printf("Node %d not found\n", nodePosition);
     }
-}
-
-// Test changing two commands
-void testModifyTwoCommands(struct LinkedList* list) {
-    testModifyCommand(list, 1, "HACKED COMMAND 1");
-    testModifyCommand(list, 2, "HACKED COMMAND 2");
-    printf("TEST: Modified two commands\n");
-}
-
-// Test changing two hashes
-void testModifyTwoHashes(struct LinkedList* list) {
-    testModifyHash(list, 1);
-    testModifyHash(list, 2);
-    printf("TEST: Modified two hashes\n");
 }
