@@ -4,19 +4,15 @@
 #include <stdlib.h>
 #include "ll.h"
 
-
-//creating pointers
 typedef void (*CanonicalizeFunc)(char*, char*);
 typedef unsigned int (*Rotl32Func)(unsigned int, int);
 typedef unsigned int (*NextHashFunc)(unsigned int, const unsigned char*, int);
-
 
 HMODULE hDLL = NULL;
 CanonicalizeFunc canonicalize = NULL;
 Rotl32Func rotl32 = NULL;
 NextHashFunc nextHash = NULL;
 
-//load blockchain dll
 int loadBlockchainDLL() {
     hDLL = LoadLibrary(L"BlockchainDLL.dll");
     if (hDLL == NULL) {
@@ -50,7 +46,6 @@ int loadBlockchainDLL() {
     return 1;
 }
 
-//nvm put it back
 void unloadBlockchainDLL() {
     if (hDLL != NULL) {
         FreeLibrary(hDLL);
