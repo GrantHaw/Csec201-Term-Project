@@ -3,6 +3,11 @@
 #include <string.h>
 #include "ll.h"
 
+// External function pointers loaded from DLL
+extern void (*canonicalize)(char*, char*);
+extern unsigned int (*rotl32)(unsigned int, int);
+extern unsigned int (*nextHash)(unsigned int, const unsigned char*, int);
+
 #define SEED 0x5A //starting val
 
 void initialize(struct LinkedList* list) {
