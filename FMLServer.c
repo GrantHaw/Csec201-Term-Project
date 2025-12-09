@@ -10,7 +10,7 @@
 
 #define PORT 8421
 
-// DLL function pointers
+//dll stuff
 typedef void (*CanonicalizeFunc)(char*, char*);
 typedef unsigned int (*Rotl32Func)(unsigned int, int);
 typedef unsigned int (*NextHashFunc)(unsigned int, const unsigned char*, int);
@@ -20,16 +20,15 @@ CanonicalizeFunc canonicalize = NULL;
 Rotl32Func rotl32 = NULL;
 NextHashFunc nextHash = NULL;
 
-// Thread arguments structure
 struct threadArgs {
     SOCKET* clientConn;
     struct LinkedList* CommandHistory;
 };
 
-int loadBlockchainDLL() {
+int loadDLL() {
     hDLL = LoadLibrary(L"BlockchainDLL.dll");
     if (hDLL == NULL) {
-        printf("ERROR: Could not load BlockchainDLL.dll\n");
+        printf("ERROR: cant load BlockchainDLL.dll\n");
         return 0;
     }
 
@@ -38,303 +37,274 @@ int loadBlockchainDLL() {
     nextHash = (NextHashFunc)GetProcAddress(hDLL, "nextHash");
 
     if (canonicalize == NULL || rotl32 == NULL || nextHash == NULL) {
-        printf("ERROR: Could not find DLL functions\n");
+        printf("ERROR: cant find DLL functions\n");
         FreeLibrary(hDLL);
         return 0;
     }
 
-    printf("Blockchain DLL loaded successfully.\n");
+    printf("DLL loaded\n");
     return 1;
 }
 
-/*
- * BUFFER OVERFLOW VULNERABILITY
- * 
- * This function checks if all characters in the input are printable ASCII.
- * 
- * VULNERABILITY: The local buffer 'checked' is only 64 bytes, but we copy
- * the entire input string into it without bounds checking. If input exceeds
- * 64 bytes, this overflows the stack buffer.
- */
-int isValidInput(char* input) {
-    char checked[64];  // vulnerability: small fixed-size buffer
+
+// checks if input is valid ascii characters
+// need this for the assignment
+int checkInput(char* input) {
+    char buf[64];
     int i;
     int len = strlen(input);
     
-    //strcpy with no bounds checking
-    // If input > 64 bytes, this overflows 'checked' buffer
-    strcpy(checked, input);
+    //copy to buffer to check
+    strcpy(buf, input);
     
-    // Check each character is printable ASCII (0x20-0x7E) or newline/carriage return
     for (i = 0; i < len; i++) {
-        if ((checked[i] < 0x20 || checked[i] > 0x7E) && 
-            checked[i] != '\n' && checked[i] != '\r') {
-            return 0;  // Invalid character found
+        // check printable ascii range
+        if ((buf[i] < 0x20 || buf[i] > 0x7E) && buf[i] != '\n' && buf[i] != '\r') {
+            return 0;
         }
     }
-    return 1;  // All characters valid
+    return 1;
 }
 
-/*
- * Parse and execute a command
- * Returns:
- *   1  = Valid command (add to history)
- *   0  = Quit command
- *  -1  = Command takes 2 arguments error
- *  -2  = First arg must be 'local' or 'remote'
- *  -3  = Second arg error (files/path/folders)
- *  -4  = Command takes no arguments
- *  -5  = Invalid command
- *  -6  = Invalid character detected
- */
-int parseCommand(char* rawCommand, struct LinkedList* CommandHistory, SOCKET* clientSock) {
-    char workingCopy[256];
+// parse command and return result code
+// 1 = good, 0 = quit, negative = error
+int parseCommand(char* rawCommand, struct LinkedList* hist, SOCKET* clientSock) {
+    char temp[256];
     char* first;
-    char* second;
+    char* second; 
     char* third;
-    char response[2048];
-    SOCKET clientConn = *clientSock;
+    char resp[2048];
+    SOCKET sock = *clientSock;
+    int len;
     
-    // Check for valid ASCII input (VULNERABLE FUNCTION)
-    if (!isValidInput(rawCommand)) {
+    //check input first
+    if (!checkInput(rawCommand)) {
         return -6;
     }
     
-    // Remove trailing newline/carriage return
-    int len = strlen(rawCommand);
+    // get rid of newline
+    len = strlen(rawCommand);
     while (len > 0 && (rawCommand[len-1] == '\n' || rawCommand[len-1] == '\r')) {
         rawCommand[len-1] = '\0';
         len--;
     }
     
-    // Make working copy for tokenization
-    strcpy(workingCopy, rawCommand);
+    strcpy(temp, rawCommand);
     
-    // Tokenize
-    first = strtok(workingCopy, " ");
+    first = strtok(temp, " ");
     second = strtok(NULL, " ");
     third = strtok(NULL, " ");
     
-    // Empty command
     if (first == NULL) {
         return -5;
     }
     
-    // quit
+    //quit
     if (strcmp(first, "quit") == 0) {
-        sprintf(response, "Goodbye.\n");
-        send(clientConn, response, strlen(response), 0);
+        sprintf(resp, "Goodbye\n");
+        send(sock, resp, strlen(resp), 0);
         return 0;
     }
     
-    // history
+    //history
     if (strcmp(first, "history") == 0) {
         if (second != NULL) {
-            return -4;  // Takes no arguments
+            return -4;
         }
-        printHistory(CommandHistory, clientSock);
+        printHistory(hist, clientSock);
         return 1;
     }
     
-    // validate
+    //validate 
     if (strcmp(first, "validate") == 0) {
         if (second != NULL) {
-            return -4;  // Takes no arguments
+            return -4;
         }
-        if (validateBlockchain(CommandHistory, clientSock)) {
-            sprintf(response, "SUCCESS> Blockchain integrity verified.\n");
+        if (validateBlockchain(hist, clientSock)) {
+            sprintf(resp, "SUCCESS> blockchain ok\n");
         } else {
-            sprintf(response, "ERROR> Blockchain integrity check failed.\n");
+            sprintf(resp, "ERROR> blockchain failed check\n");
         }
-        send(clientConn, response, strlen(response), 0);
+        send(sock, resp, strlen(resp), 0);
         return 1;
     }
     
-    // upload <local> <remote>
+    //upload
     if (strcmp(first, "upload") == 0) {
         if (second == NULL || third == NULL) {
-            return -1;  //takes 2 arguments
+            return -1;
         }
-        sprintf(response, "SUCCESS> upload %s %s\n", second, third);
-        send(clientConn, response, strlen(response), 0);
+        sprintf(resp, "SUCCESS> upload %s %s\n", second, third);
+        send(sock, resp, strlen(resp), 0);
         return 1;
     }
     
-    // download <remote> <local>
+    //download
     if (strcmp(first, "download") == 0) {
         if (second == NULL || third == NULL) {
-            return -1;  // Takes 2 arguments
+            return -1;
         }
-        sprintf(response, "SUCCESS> download %s %s\n", second, third);
-        send(clientConn, response, strlen(response), 0);
+        sprintf(resp, "SUCCESS> download %s %s\n", second, third);
+        send(sock, resp, strlen(resp), 0);
         return 1;
     }
     
-    // delete local|remote <filename>
+    // delete
     if (strcmp(first, "delete") == 0) {
         if (second == NULL || third == NULL) {
-            return -1;  // Takes 2 arguments
+            return -1;
         }
         if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
-            return -2;  // First arg must be local or remote
+            return -2;
         }
-        sprintf(response, "SUCCESS> delete %s %s\n", second, third);
-        send(clientConn, response, strlen(response), 0);
+        sprintf(resp, "SUCCESS> delete %s %s\n", second, third);
+        send(sock, resp, strlen(resp), 0);
         return 1;
     }
     
-    // change local|remote <filepath>
+    //change
     if (strcmp(first, "change") == 0) {
         if (second == NULL || third == NULL) {
-            return -1;  // Takes 2 arguments
+            return -1; 
         }
         if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
-            return -2;  // First arg must be local or remote
+            return -2;
         }
-        sprintf(response, "SUCCESS> change %s %s\n", second, third);
-        send(clientConn, response, strlen(response), 0);
+        sprintf(resp, "SUCCESS> change %s %s\n", second, third);
+        send(sock, resp, strlen(resp), 0);
         return 1;
     }
     
-    // show local|remote path|files|folders
+    //show
     if (strcmp(first, "show") == 0) {
         if (second == NULL || third == NULL) {
-            return -1;  // Takes 2 arguments
+            return -1;
         }
         if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
-            return -2;  // First arg must be local or remote
+            return -2;
         }
         if (strcmp(third, "path") != 0 && strcmp(third, "files") != 0 && strcmp(third, "folders") != 0) {
-            return -3;  // Second arg must be path/files/folders
+            return -3;
         }
-        sprintf(response, "SUCCESS> show %s %s\n", second, third);
-        send(clientConn, response, strlen(response), 0);
+        sprintf(resp, "SUCCESS> show %s %s\n", second, third);
+        send(sock, resp, strlen(resp), 0);
         return 1;
     }
     
-    // Unknown command
-    return -5;
+    return -5; //invalid cmd
 }
 
 int __stdcall HandleConnection(struct threadArgs* args) {
     SOCKET clientConn = *(args->clientConn);
-    struct LinkedList* CommandHistory = args->CommandHistory;
+    struct LinkedList* hist = args->CommandHistory;
     int bytesRead;
-    char* rawCommand;
+    char* rawCmd;
+    int result;
     
-    char banner[] = "WELCOME TO FML SERVER!\n";
+    char banner[] = "WELCOME TO FML SERVER\n";
     char prompt[] = "FML> ";
-    char errorTwoArgs[] = "ERROR> command takes 2 arguments\n";
-    char errorFirstArg[] = "ERROR> 1st arg must be 'local' or 'remote'\n";
-    char errorSecondArg[] = "ERROR> 2nd argument must be 'files', 'path', or 'folders'\n";
-    char errorNoArgs[] = "ERROR> command takes no arguments\n";
-    char errorInvalidCommand[] = "ERROR> Invalid command\n";
-    char errorInvalidChar[] = "ERROR> Invalid character detected\n";
-    char errorOther[] = "ERROR> OTHER\n";
+    char err1[] = "ERROR> command takes 2 arguments\n";
+    char err2[] = "ERROR> 1st arg must be 'local' or 'remote'\n";
+    char err3[] = "ERROR> 2nd arg must be 'files', 'path', or 'folders'\n";
+    char err4[] = "ERROR> command takes no arguments\n";
+    char err5[] = "ERROR> invalid command\n";
+    char err6[] = "ERROR> invalid character\n";
+    char errOther[] = "ERROR> something went wrong\n";
     
-    int parseResult;
-    rawCommand = (char*)malloc(sizeof(char) * 1000);
+    rawCmd = (char*)malloc(sizeof(char) * 1000);
     
     send(clientConn, banner, sizeof(banner), 0);
     
     while (1) {
-        printf("Sending prompt\n");
+        //printf("sending prompt\n");
         send(clientConn, prompt, sizeof(prompt), 0);
-        printf("Waiting on command:\n");
+        //printf("waiting...\n");
         
-        bytesRead = recv(clientConn, rawCommand, 1000, 0);
+        bytesRead = recv(clientConn, rawCmd, 1000, 0);
         if (bytesRead == -1) break;
-        rawCommand[bytesRead] = '\0';
-        printf("Received command: %s\n", rawCommand);
+        rawCmd[bytesRead] = '\0';
+        printf("got: %s\n", rawCmd);
         
-        parseResult = parseCommand(rawCommand, CommandHistory, &clientConn);
+        result = parseCommand(rawCmd, hist, &clientConn);
         
-        if (parseResult == 1) {
-            addCommand(CommandHistory, rawCommand);
-            printf("%s added to history\n", rawCommand);
+        if (result == 1) {
+            addCommand(hist, rawCmd);
+            printf("added to history: %s\n", rawCmd);
         }
-        else if (parseResult == 0) {
-            printf("Terminating Connection\n");
+        else if (result == 0) {
+            printf("client quit\n");
             break;
         }
-        else if (parseResult == -1) {
-            printf("Sending TwoArgs Error\n");
-            send(clientConn, errorTwoArgs, sizeof(errorTwoArgs), 0);
+        else if (result == -1) {
+            send(clientConn, err1, sizeof(err1), 0);
         }
-        else if (parseResult == -2) {
-            printf("Sending FirstArg Error\n");
-            send(clientConn, errorFirstArg, sizeof(errorFirstArg), 0);
+        else if (result == -2) {
+            send(clientConn, err2, sizeof(err2), 0);
         }
-        else if (parseResult == -3) {
-            printf("Sending SecondArg Error\n");
-            send(clientConn, errorSecondArg, sizeof(errorSecondArg), 0);
+        else if (result == -3) {
+            send(clientConn, err3, sizeof(err3), 0);
         }
-        else if (parseResult == -4) {
-            printf("Sending NoArgs Error\n");
-            send(clientConn, errorNoArgs, sizeof(errorNoArgs), 0);
+        else if (result == -4) {
+            send(clientConn, err4, sizeof(err4), 0);
         }
-        else if (parseResult == -5) {
-            printf("Sending Invalid Command Error\n");
-            send(clientConn, errorInvalidCommand, sizeof(errorInvalidCommand), 0);
+        else if (result == -5) {
+            send(clientConn, err5, sizeof(err5), 0);
         }
-        else if (parseResult == -6) {
-            printf("Sending Invalid Character Error\n");
-            send(clientConn, errorInvalidChar, sizeof(errorInvalidChar), 0);
+        else if (result == -6) {
+            send(clientConn, err6, sizeof(err6), 0);
         }
         else {
-            send(clientConn, errorOther, sizeof(errorOther), 0);
+            send(clientConn, errOther, sizeof(errOther), 0);
         }
     }
     
-    free(rawCommand);
+    free(rawCmd);
     closesocket(clientConn);
     _endthreadex(0);
     return 0;
 }
 
 void BeginServer() {
-    WSADATA winSockData;
-    SOCKET serverSocket, clientSocket;
-    struct sockaddr_in serverAddress, clientAddress;
-    int addrLen = sizeof(clientAddress);
+    WSADATA wsa;
+    SOCKET serverSock, clientSock;
+    struct sockaddr_in serverAddr, clientAddr;
+    int addrLen = sizeof(clientAddr);
     HANDLE thread;
-    int result;
+    int res;
+    int connNum = 0;
     
-    struct LinkedList* CommandHistory = (struct LinkedList*)malloc(sizeof(struct LinkedList));
-    initialize(CommandHistory);
-    srand(time(NULL));
-    int threadnum = 0;
+    struct LinkedList* hist = (struct LinkedList*)malloc(sizeof(struct LinkedList));
+    initialize(hist);
     
-    // Load blockchain DLL
-    if (!loadBlockchainDLL()) {
-        printf("Failed to load blockchain DLL. Exiting.\n");
+    if (!loadDLL()) {
+        printf("dll failed\n");
         return;
     }
     
-    result = WSAStartup(MAKEWORD(2, 2), &winSockData);
-    if (result != 0) {
-        printf("Failed to initialize WinSock\n");
+    res = WSAStartup(MAKEWORD(2, 2), &wsa);
+    if (res != 0) {
+        printf("winsock failed\n");
         exit(-1);
     }
     
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-    serverAddress.sin_port = htons(PORT);
+    serverSock = socket(AF_INET, SOCK_STREAM, 0);
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(PORT);
     
-    bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
-    listen(serverSocket, 5);
+    bind(serverSock, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+    listen(serverSock, 5);
     
-    printf("FML Server listening on port %d...\n", PORT);
+    printf("server running on port %d\n", PORT);
     
     while (1) {
-        clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddress, &addrLen);
+        clientSock = accept(serverSock, (struct sockaddr*)&clientAddr, &addrLen);
         
         struct threadArgs* args = (struct threadArgs*)malloc(sizeof(struct threadArgs));
-        args->clientConn = &clientSocket;
-        args->CommandHistory = CommandHistory;
-        threadnum++;
-        printf("Connection #%d established\n", threadnum);
+        args->clientConn = &clientSock;
+        args->CommandHistory = hist;
+        connNum++;
+        printf("connection %d\n", connNum);
         thread = (HANDLE)_beginthreadex(NULL, 0, (unsigned int(__stdcall*)(void*))HandleConnection, args, 0, NULL);
     }
 }
@@ -343,13 +313,3 @@ int main(void) {
     BeginServer();
     return 0;
 }
-
-
-
-
-
-
-
-
-
-

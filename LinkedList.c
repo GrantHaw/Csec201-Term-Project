@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <winsock2.h>
 #include "ll.h"
 
 #define SEED 0x5A
 
-// External function pointers loaded from DLL
+// these come from the dll
 extern void (*canonicalize)(char*, char*);
 extern unsigned int (*rotl32)(unsigned int, int);
 extern unsigned int (*nextHash)(unsigned int, const unsigned char*, int);
@@ -17,172 +18,186 @@ void initialize(struct LinkedList* list) {
 
 void addCommand(struct LinkedList* list, char* command) {
     struct node* newNode = (struct node*)malloc(sizeof(struct node));
-    char canonicalCommand[256];
-    unsigned int prevHash;
+    char canonical[256];
+    unsigned int prev;
     
-    canonicalize(command, canonicalCommand);
-    strcpy(newNode->command, canonicalCommand);
+    canonicalize(command, canonical);
+    strcpy(newNode->command, canonical);
     
     if (list->head != NULL) {
-        prevHash = list->head->hash;
+        prev = list->head->hash;
     } else {
-        prevHash = SEED;
+        prev = SEED;
     }
     
-    newNode->hash = nextHash(prevHash, (const unsigned char*)canonicalCommand, strlen(canonicalCommand));
+    newNode->hash = nextHash(prev, (const unsigned char*)canonical, strlen(canonical));
     newNode->next = list->head;
     list->head = newNode;
     list->size++;
 }
 
-void printHistory(struct LinkedList* list) {
+void printHistory(struct LinkedList* list, SOCKET* clientSock) {
     struct node* temp = list->head;
-    int commandNumber = list->size;
+    int num = list->size;
+    int bw = 0; //bytes written
+    char output[5000] = "";
+    SOCKET sock = *clientSock;
     
     if (temp == NULL) {
-        printf("No command history available.\n");
+        bw = sprintf(output, "History is empty\n");
+        send(sock, output, strlen(output), 0);
         return;
     }
     
-    printf("Command History:\n");
-    while (temp != NULL) {
-        printf("%d: %s [Hash: 0x%08X]\n", commandNumber, temp->command, temp->hash);
-        temp = temp->next;
-        commandNumber--;
-    }
-}
-
-int validateBlockchain(struct LinkedList* list) {
-    if (list->head == NULL) {
-        printf("Blockchain is empty - valid by default.\n");
-        return 1;
-    }
+    bw = sprintf(output, "------\n");
     
+    while (temp != NULL) {
+        bw += sprintf(&(output[bw]), "%d: %p  Hash: 0x%08X  Cmd: %s\n", 
+            num, temp, temp->hash, temp->command);
+        temp = temp->next;
+        num--;
+    }
+    bw += sprintf(&(output[bw]), "------\n");
+    
+    //do validation inline
     struct node* nodes[1000];
     int count = 0;
-    struct node* current = list->head;
-    
-    while (current != NULL && count < 1000) {
-        nodes[count] = current;
-        current = current->next;
+    temp = list->head;
+    while (temp != NULL && count < 1000) {
+        nodes[count] = temp;
+        temp = temp->next;
         count++;
     }
     
-    unsigned int prevHash = SEED;
-    int alterationDetected = 0;
+    unsigned int prev = SEED;
+    int ok = 1;
     int i;
-    
     for (i = count - 1; i >= 0; i--) {
-        unsigned int recomputedHash = nextHash(prevHash, (const unsigned char*)nodes[i]->command, strlen(nodes[i]->command));
-        
-        if (nodes[i]->hash != recomputedHash) {
-            printf("Command history validation FAILED.\n");
-            printf("First invalid node detected: \"%s\"\n", nodes[i]->command);
-            printf("Expected hash: 0x%08X\n", recomputedHash);
-            printf("Actual hash:   0x%08X\n", nodes[i]->hash);
-            alterationDetected = 1;
+        unsigned int check = nextHash(prev, (const unsigned char*)nodes[i]->command, strlen(nodes[i]->command));
+        if (nodes[i]->hash != check) {
+            ok = 0;
             break;
         }
+        prev = nodes[i]->hash;
+    }
+    
+    if (ok) {
+        bw += sprintf(&(output[bw]), "blockchain integrity ok\n");
+    } else {
+        bw += sprintf(&(output[bw]), "WARNING: blockchain compromised!\n");
+    }
+    
+    send(sock, output, strlen(output), 0);
+}
+
+int validateBlockchain(struct LinkedList* list, SOCKET* clientSock) {
+    SOCKET sock = *clientSock;
+    char err[1000] = "";
+    int bw = 0;
+    int i;
+    
+    if (list->head == NULL) {
+        return 1; //empty is valid i guess
+    }
+    
+    //put nodes in array so we can go backwards
+    struct node* nodes[1000];
+    int count = 0;
+    struct node* curr = list->head;
+    while (curr != NULL && count < 1000) {
+        nodes[count] = curr;
+        curr = curr->next;
+        count++;
+    }
+    
+    unsigned int prev = SEED;
+    for (i = count - 1; i >= 0; i--) {
+        unsigned int expected = nextHash(prev, (const unsigned char*)nodes[i]->command, strlen(nodes[i]->command));
         
-        prevHash = nodes[i]->hash;
+        if (nodes[i]->hash != expected) {
+            //found bad node
+            bw = sprintf(err, "ERROR> alteration found:\n");
+            bw += sprintf(&(err[bw]), "  Node: %p\n", nodes[i]);
+            bw += sprintf(&(err[bw]), "  Hash: 0x%08X (expected 0x%08X)\n", nodes[i]->hash, expected);
+            bw += sprintf(&(err[bw]), "  Cmd: %s\n", nodes[i]->command);
+            send(sock, err, strlen(err), 0);
+            return 0;
+        }
+        prev = nodes[i]->hash;
     }
     
-    if (!alterationDetected) {
-        printf("Command history validation PASSED - no alterations detected.\n");
-        return 1;
-    }
-    
-    return 0;
+    return 1;
 }
 
 void deleteList(struct LinkedList* list) {
-    struct node* current = list->head;
+    struct node* curr = list->head;
     struct node* next;
     
-    while (current != NULL) {
-        next = current->next;
-        free(current);
-        current = next;
+    while (curr != NULL) {
+        next = curr->next;
+        free(curr);
+        curr = next;
     }
-    
     list->head = NULL;
     list->size = 0;
 }
 
-void testModifyCommand(struct LinkedList* list, int nodePosition, char* newCommand) {
+//test funcs - prob dont need these anymore but keeping just in case
+void testModifyCommand(struct LinkedList* list, int pos, char* newCmd) {
     if (list->head == NULL) {
-        printf("Cannot test - blockchain is empty\n");
+        printf("list empty\n");
         return;
     }
     
-    struct node* current = list->head;
-    int count = 1;
-    
-    while (current != NULL && count < nodePosition) {
-        current = current->next;
-        count++;
+    struct node* curr = list->head;
+    int c = 1;
+    while (curr != NULL && c < pos) {
+        curr = curr->next;
+        c++;
     }
     
-    if (current != NULL) {
-        printf("TEST: Changing command from \"%s\" to \"%s\"\n", current->command, newCommand);
-        strcpy(current->command, newCommand);
-    } else {
-        printf("Node %d not found\n", nodePosition);
+    if (curr != NULL) {
+        printf("changing \"%s\" to \"%s\"\n", curr->command, newCmd);
+        strcpy(curr->command, newCmd);
     }
 }
 
-void testModifyHash(struct LinkedList* list, int nodePosition) {
-    if (list->head == NULL) {
-        printf("Cannot test - blockchain is empty\n");
-        return;
+void testModifyHash(struct LinkedList* list, int pos) {
+    if (list->head == NULL) return;
+    
+    struct node* curr = list->head;
+    int c = 1;
+    while (curr != NULL && c < pos) {
+        curr = curr->next;
+        c++;
     }
-    
-    struct node* current = list->head;
-    int count = 1;
-    
-    while (current != NULL && count < nodePosition) {
-        current = current->next;
-        count++;
-    }
-    
-    if (current != NULL) {
-        printf("TEST: Changing hash from 0x%08X to 0x%08X\n", current->hash, current->hash + 1);
-        current->hash = current->hash + 1;
-    } else {
-        printf("Node %d not found\n", nodePosition);
+    if (curr != NULL) {
+        curr->hash = curr->hash + 1;
     }
 }
 
-void testDeleteNode(struct LinkedList* list, int nodePosition) {
-    if (list->head == NULL) {
-        printf("Cannot test - blockchain is empty\n");
-        return;
-    }
+void testDeleteNode(struct LinkedList* list, int pos) {
+    if (list->head == NULL) return;
     
-    if (nodePosition == 1) {
+    if (pos == 1) {
         struct node* temp = list->head;
-        printf("TEST: Deleting head node \"%s\"\n", temp->command);
         list->head = list->head->next;
         free(temp);
         list->size--;
         return;
     }
     
-    struct node* current = list->head;
-    int count = 1;
-    
-    while (current != NULL && current->next != NULL && count < nodePosition - 1) {
-        current = current->next;
-        count++;
+    struct node* curr = list->head;
+    int c = 1;
+    while (curr != NULL && curr->next != NULL && c < pos - 1) {
+        curr = curr->next;
+        c++;
     }
     
-    if (current != NULL && current->next != NULL) {
-        struct node* nodeToDelete = current->next;
-        printf("TEST: Deleting node \"%s\"\n", nodeToDelete->command);
-        current->next = nodeToDelete->next;
-        free(nodeToDelete);
+    if (curr != NULL && curr->next != NULL) {
+        struct node* del = curr->next;
+        curr->next = del->next;
+        free(del);
         list->size--;
-    } else {
-        printf("Node %d not found\n", nodePosition);
     }
 }

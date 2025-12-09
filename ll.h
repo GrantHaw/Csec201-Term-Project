@@ -1,38 +1,30 @@
 #pragma once
+#include <winsock2.h>
 
 struct node {
-	char command[256];
-	
-	//32 bit hash
-	unsigned int hash;
-					
-	// next node
-	struct node* next;
+    char command[256];
+    unsigned int hash; //32 bit
+    struct node* next;
 };
 
 struct LinkedList {
-	int size;
-	struct node* head;
+    int size;
+    struct node* head;
 };
 
-//func prototypes
 void initialize(struct LinkedList* list);
-
 void addCommand(struct LinkedList* list, char* command);
-
-void printHistory(struct LinkedList* list);
-
+void printHistory(struct LinkedList* list, SOCKET* clientSock);
 void deleteList(struct LinkedList* list);
 
+//from dll
 void canonicalize(char* input, char* output);
-
 unsigned int rotl32(unsigned int x, int r);
-
 unsigned int nextHash(unsigned int prevHash, const unsigned char* bytes, int length);
 
-int validateBlockchain(struct LinkedList* list);
+int validateBlockchain(struct LinkedList* list, SOCKET* clientSock);
 
-// Test blockchain!
+//test stuff
 void testModifyCommand(struct LinkedList* list, int nodePosition, char* newCommand);
 void testModifyHash(struct LinkedList* list, int nodePosition);
 void testDeleteNode(struct LinkedList* list, int nodePosition);
