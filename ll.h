@@ -17,11 +17,6 @@ void addCommand(struct LinkedList* list, char* command);
 void printHistory(struct LinkedList* list, SOCKET* clientSock);
 void deleteList(struct LinkedList* list);
 
-//from dll
-void canonicalize(char* input, char* output);
-unsigned int rotl32(unsigned int x, int r);
-unsigned int nextHash(unsigned int prevHash, const unsigned char* bytes, int length);
-
 int validateBlockchain(struct LinkedList* list, SOCKET* clientSock);
 
 //test stuff

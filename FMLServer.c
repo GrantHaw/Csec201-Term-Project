@@ -16,9 +16,9 @@ typedef unsigned int (*Rotl32Func)(unsigned int, int);
 typedef unsigned int (*NextHashFunc)(unsigned int, const unsigned char*, int);
 
 HMODULE hDLL = NULL;
-CanonicalizeFunc canonicalize = NULL;
-Rotl32Func rotl32 = NULL;
-NextHashFunc nextHash = NULL;
+CanonicalizeFunc pfnCanonicalize = NULL;
+Rotl32Func pfnRotl32 = NULL;
+NextHashFunc pfnNextHash = NULL;
 
 struct threadArgs {
     SOCKET* clientConn;
@@ -26,17 +26,17 @@ struct threadArgs {
 };
 
 int loadDLL() {
-    hDLL = LoadLibrary(L"BlockchainDLL.dll");
+    hDLL = LoadLibraryA("BlockchainDLL.dll");
     if (hDLL == NULL) {
         printf("ERROR: cant load BlockchainDLL.dll\n");
         return 0;
     }
 
-    canonicalize = (CanonicalizeFunc)GetProcAddress(hDLL, "canonicalize");
-    rotl32 = (Rotl32Func)GetProcAddress(hDLL, "rotl32");
-    nextHash = (NextHashFunc)GetProcAddress(hDLL, "nextHash");
+    pfnCanonicalize = (CanonicalizeFunc)GetProcAddress(hDLL, "canonicalize");
+    pfnRotl32 = (Rotl32Func)GetProcAddress(hDLL, "rotl32");
+    pfnNextHash = (NextHashFunc)GetProcAddress(hDLL, "nextHash");
 
-    if (canonicalize == NULL || rotl32 == NULL || nextHash == NULL) {
+    if (pfnCanonicalize == NULL || pfnRotl32 == NULL || pfnNextHash == NULL) {
         printf("ERROR: cant find DLL functions\n");
         FreeLibrary(hDLL);
         return 0;
@@ -52,11 +52,11 @@ int loadDLL() {
 int checkInput(char* input) {
     char buf[64];
     int i;
-    int len = strlen(input);
-    
+    int len = (int)strlen(input);
+
     //copy to buffer to check
     strcpy(buf, input);
-    
+
     for (i = 0; i < len; i++) {
         // check printable ascii range
         if ((buf[i] < 0x20 || buf[i] > 0x7E) && buf[i] != '\n' && buf[i] != '\r') {
@@ -71,41 +71,41 @@ int checkInput(char* input) {
 int parseCommand(char* rawCommand, struct LinkedList* hist, SOCKET* clientSock) {
     char temp[256];
     char* first;
-    char* second; 
+    char* second;
     char* third;
     char resp[2048];
     SOCKET sock = *clientSock;
     int len;
-    
+
     //check input first
     if (!checkInput(rawCommand)) {
         return -6;
     }
-    
+
     // get rid of newline
-    len = strlen(rawCommand);
-    while (len > 0 && (rawCommand[len-1] == '\n' || rawCommand[len-1] == '\r')) {
-        rawCommand[len-1] = '\0';
+    len = (int)strlen(rawCommand);
+    while (len > 0 && (rawCommand[len - 1] == '\n' || rawCommand[len - 1] == '\r')) {
+        rawCommand[len - 1] = '\0';
         len--;
     }
-    
+
     strcpy(temp, rawCommand);
-    
+
     first = strtok(temp, " ");
     second = strtok(NULL, " ");
     third = strtok(NULL, " ");
-    
+
     if (first == NULL) {
         return -5;
     }
-    
+
     //quit
     if (strcmp(first, "quit") == 0) {
         sprintf(resp, "Goodbye\n");
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 0;
     }
-    
+
     //history
     if (strcmp(first, "history") == 0) {
         if (second != NULL) {
@@ -114,7 +114,7 @@ int parseCommand(char* rawCommand, struct LinkedList* hist, SOCKET* clientSock) 
         printHistory(hist, clientSock);
         return 1;
     }
-    
+
     //validate 
     if (strcmp(first, "validate") == 0) {
         if (second != NULL) {
@@ -122,33 +122,34 @@ int parseCommand(char* rawCommand, struct LinkedList* hist, SOCKET* clientSock) 
         }
         if (validateBlockchain(hist, clientSock)) {
             sprintf(resp, "SUCCESS> blockchain ok\n");
-        } else {
+        }
+        else {
             sprintf(resp, "ERROR> blockchain failed check\n");
         }
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 1;
     }
-    
+
     //upload
     if (strcmp(first, "upload") == 0) {
         if (second == NULL || third == NULL) {
             return -1;
         }
         sprintf(resp, "SUCCESS> upload %s %s\n", second, third);
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 1;
     }
-    
+
     //download
     if (strcmp(first, "download") == 0) {
         if (second == NULL || third == NULL) {
             return -1;
         }
         sprintf(resp, "SUCCESS> download %s %s\n", second, third);
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 1;
     }
-    
+
     // delete
     if (strcmp(first, "delete") == 0) {
         if (second == NULL || third == NULL) {
@@ -158,23 +159,23 @@ int parseCommand(char* rawCommand, struct LinkedList* hist, SOCKET* clientSock) 
             return -2;
         }
         sprintf(resp, "SUCCESS> delete %s %s\n", second, third);
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 1;
     }
-    
+
     //change
     if (strcmp(first, "change") == 0) {
         if (second == NULL || third == NULL) {
-            return -1; 
+            return -1;
         }
         if (strcmp(second, "local") != 0 && strcmp(second, "remote") != 0) {
             return -2;
         }
         sprintf(resp, "SUCCESS> change %s %s\n", second, third);
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 1;
     }
-    
+
     //show
     if (strcmp(first, "show") == 0) {
         if (second == NULL || third == NULL) {
@@ -187,10 +188,10 @@ int parseCommand(char* rawCommand, struct LinkedList* hist, SOCKET* clientSock) 
             return -3;
         }
         sprintf(resp, "SUCCESS> show %s %s\n", second, third);
-        send(sock, resp, strlen(resp), 0);
+        send(sock, resp, (int)strlen(resp), 0);
         return 1;
     }
-    
+
     return -5; //invalid cmd
 }
 
@@ -200,7 +201,7 @@ int __stdcall HandleConnection(struct threadArgs* args) {
     int bytesRead;
     char* rawCmd;
     int result;
-    
+
     char banner[] = "WELCOME TO FML SERVER\n";
     char prompt[] = "FML> ";
     char err1[] = "ERROR> command takes 2 arguments\n";
@@ -210,23 +211,23 @@ int __stdcall HandleConnection(struct threadArgs* args) {
     char err5[] = "ERROR> invalid command\n";
     char err6[] = "ERROR> invalid character\n";
     char errOther[] = "ERROR> something went wrong\n";
-    
+
     rawCmd = (char*)malloc(sizeof(char) * 1000);
-    
+
     send(clientConn, banner, sizeof(banner), 0);
-    
+
     while (1) {
         //printf("sending prompt\n");
         send(clientConn, prompt, sizeof(prompt), 0);
         //printf("waiting...\n");
-        
+
         bytesRead = recv(clientConn, rawCmd, 1000, 0);
         if (bytesRead == -1) break;
         rawCmd[bytesRead] = '\0';
         printf("got: %s\n", rawCmd);
-        
+
         result = parseCommand(rawCmd, hist, &clientConn);
-        
+
         if (result == 1) {
             addCommand(hist, rawCmd);
             printf("added to history: %s\n", rawCmd);
@@ -257,7 +258,7 @@ int __stdcall HandleConnection(struct threadArgs* args) {
             send(clientConn, errOther, sizeof(errOther), 0);
         }
     }
-    
+
     free(rawCmd);
     closesocket(clientConn);
     _endthreadex(0);
@@ -272,34 +273,34 @@ void BeginServer() {
     HANDLE thread;
     int res;
     int connNum = 0;
-    
+
     struct LinkedList* hist = (struct LinkedList*)malloc(sizeof(struct LinkedList));
     initialize(hist);
-    
+
     if (!loadDLL()) {
         printf("dll failed\n");
         return;
     }
-    
+
     res = WSAStartup(MAKEWORD(2, 2), &wsa);
     if (res != 0) {
         printf("winsock failed\n");
         exit(-1);
     }
-    
+
     serverSock = socket(AF_INET, SOCK_STREAM, 0);
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = htons(PORT);
-    
+
     bind(serverSock, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
     listen(serverSock, 5);
-    
+
     printf("server running on port %d\n", PORT);
-    
+
     while (1) {
         clientSock = accept(serverSock, (struct sockaddr*)&clientAddr, &addrLen);
-        
+
         struct threadArgs* args = (struct threadArgs*)malloc(sizeof(struct threadArgs));
         args->clientConn = &clientSock;
         args->CommandHistory = hist;
